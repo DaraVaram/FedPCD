@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FedPCD — Priority-Constrained Federated Aggregation</title>
+<meta name="description" content="FedPCD keeps the FedAvg update as the primary direction and turns every client into a minimum-progress constraint. The server takes the direction closest to the average that still gives each client a τ-fraction of progress, with a short memory of recently seen clients for partial participation. When the average already serves everyone, the direction is exactly FedAvg's." />
+<meta name="author" content="Yousef Irshaid, Dara Varam, Mohamed I. AlHajri" />
+
+<!-- Open Graph / social preview -->
+<meta property="og:type" content="website" />
+<meta property="og:title" content="FedPCD: Priority-Constrained Federated Aggregation" />
+<meta property="og:description" content="Keep the average. Protect the clients. FedPCD follows the FedAvg direction and bends it only as much as needed to give every client a minimum of progress." />
+<meta property="og:url" content="https://daravaram.github.io/FedPCD/" />
+<meta property="og:image" content="https://daravaram.github.io/FedPCD/assets/video-poster.jpg" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content="https://daravaram.github.io/FedPCD/assets/video-poster.jpg" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23C2185B'/%3E%3Cpath d='M11.5 23.5V9h10M11.5 16h7.5' stroke='white' stroke-width='2.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="css/style.css" />
+
+<!-- KaTeX for typeset equations -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.querySelector('main'),{delimiters:[{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false});"></script>
+</head>
+<body>
+
+<div class="scroll-progress" id="scrollProgress" aria-hidden="true"></div>
+
+<nav class="dotnav" id="dotnav" aria-label="Section navigation">
+  <a href="#hero" data-label="Top" class="active"><span></span></a>
+  <a href="#tldr" data-label="TL;DR"><span></span></a>
+  <a href="#video" data-label="Video"><span></span></a>
+  <a href="#figure" data-label="Interactive"><span></span></a>
+  <a href="#method" data-label="The idea"><span></span></a>
+  <a href="#history" data-label="History"><span></span></a>
+  <a href="#guarantees" data-label="Guarantees"><span></span></a>
+  <a href="#results" data-label="Results"><span></span></a>
+  <a href="#ablation" data-label="What matters"><span></span></a>
+  <a href="#scope" data-label="Scope"><span></span></a>
+  <a href="#cite" data-label="Cite"><span></span></a>
+</nav>
+
+<!-- ============================ HERO ============================ -->
+<header class="hero" id="hero">
+  <div class="hero-bg" aria-hidden="true">
+    <!-- the paper's worked example: clients at 10°, 45°, 155°, their average, and its projection at τ = 0.25 -->
+    <svg viewBox="0 0 1200 700" preserveAspectRatio="xMaxYMax slice"><g transform="translate(62,0)">
+      <polygon class="hero-region" points="925,370.4 1102.5,-10.2 852.1,-43.2"/>
+      <g class="hero-bounds" fill="none" stroke="currentColor">
+        <line x1="760.4" y1="723.3" x2="1100.6" y2="-6.3"/>
+        <line x1="988.5" y1="731.2" x2="852.8" y2="-38.9"/>
+        <line x1="1135.9" y1="714.5" x2="582.9" y2="161.5"/>
+      </g>
+      <g class="hero-clients" fill="none" stroke="currentColor">
+        <line x1="900" y1="560" x2="1126.5" y2="520.1"/>
+        <line x1="900" y1="560" x2="1062.6" y2="397.4"/>
+        <line x1="900" y1="560" x2="691.5" y2="462.8"/>
+      </g>
+      <line class="hero-avg" x1="900" y1="560" x2="1018.8" y2="363.1" fill="none" stroke="currentColor"/>
+      <path id="heroTrace" class="hero-trace" d="M900,560 L940.8,348.1" fill="none" stroke="currentColor"/>
+      <g class="hero-marks">
+        <circle cx="900" cy="560" r="9"/>
+        <circle cx="1126.5" cy="520.1" r="8"/>
+        <circle cx="1062.6" cy="397.4" r="8"/>
+        <circle cx="691.5" cy="462.8" r="8"/>
+        <polygon points="944.6,328.4 953.5,355.5 927.9,350.6"/>
+      </g>
+    </g></svg>
+  </div>
+
+  <div class="wrap hero-inner">
+    <p class="eyebrow reveal">Fair federated learning under heterogeneity</p>
+    <h1 class="hero-title reveal">Keep the average.<br/>Protect the clients.
+      <span class="hero-name">FedPCD: Priority-Constrained Federated Aggregation</span></h1>
+    <p class="hero-sub reveal">A federated aggregation rule that follows the <em>FedAvg direction</em> and bends it <em>only&nbsp;as&nbsp;much&nbsp;as&nbsp;needed</em> to give every client a minimum of progress. It has one tolerance&nbsp;<span class="m">τ</span>, keeps a short server-side memory of recently seen clients, and returns the FedAvg direction unchanged whenever no client falls short.</p>
+
+    <div class="authors reveal">
+      <span class="author">Yousef Irshaid<sup>★,1</sup></span>
+      <span class="author">Dara Varam<sup>★,1,2</sup></span>
+      <span class="author">Mohamed I. AlHajri<sup>★,1</sup></span>
+      <div class="affil">
+        <span><sup>1</sup> American University of Sharjah</span>
+        <span><sup>2</sup> Senseable City Lab, MIT</span>
+        <span class="eq"><sup>★</sup> Equal contribution</span>
+      </div>
+      <p class="venue"><span class="venue-pill">Preprint · under review</span></p>
+    </div>
+
+    <div class="actions reveal">
+      <a class="btn btn-primary" href="#video">
+        <svg viewBox="0 0 24 24" class="ico ico-fill"><path d="M8 5v14l11-7z"/></svg>
+        Watch the video
+      </a>
+      <a class="btn" href="#" data-link="paper">
+        <svg viewBox="0 0 24 24" class="ico"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/></svg>
+        Paper
+      </a>
+      <a class="btn" href="#" data-link="arxiv">
+        <svg viewBox="0 0 24 24" class="ico"><path d="M4 5h16M4 12h16M4 19h10"/></svg>
+        arXiv
+      </a>
+      <a class="btn" href="#" data-link="code">
+        <svg viewBox="0 0 24 24" class="ico"><path d="M9 18l-6-6 6-6M15 6l6 6-6 6"/></svg>
+        Code
+      </a>
+      <a class="btn" href="#cite">
+        <svg viewBox="0 0 24 24" class="ico"><path d="M7 7h4v4H7zM7 11c0 3-1 4-3 5M13 7h4v4h-4zM13 11c0 3-1 4-3 5"/></svg>
+        BibTeX
+      </a>
+    </div>
+  </div>
+  <a class="scroll-cue" href="#tldr" aria-label="Scroll down"><span></span></a>
+</header>
+
+<main>
+
+<!-- ============================ TL;DR ============================ -->
+<section id="tldr" class="section">
+  <div class="wrap">
+    <p class="kicker reveal">TL;DR</p>
+    <div class="tldr-card reveal">
+      <p class="tldr-lead">FedAvg trains one model for many clients by averaging their updates. When clients hold very different data, that average can make <strong>little, no, or even negative progress</strong> for some of them. Existing fairness-aware methods reweight clients, correct conflicting updates, or search for a common descent direction, and in doing so they often change the global direction or treat every client as a symmetric peer. <span class="hl">FedPCD keeps the FedAvg direction as the primary objective and turns every client into a minimum-progress constraint.</span> The server takes the direction closest to the average that still gives each client a <span class="m">τ</span>-fraction of progress, and it remembers recently seen clients so that partial participation does not leave them unprotected. When the average already serves everyone, the direction is <strong>exactly FedAvg's</strong>.</p>
+      <div class="chips">
+        <span class="chip"><b>18 / 18</b> settings with the highest global accuracy</span>
+        <span class="chip"><b>17 / 18</b> with the highest worst-10% client accuracy</span>
+        <span class="chip"><b>71.9%</b> vs 48.1% for FedAvg <span class="chip-sub">CIFAR-10, α = 0.01, 5% participation</span></span>
+        <span class="chip"><b>10–44%</b> of the rounds to reach FedAvg's final accuracy</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ VIDEO ============================ -->
+<section id="video" class="section section-video">
+  <div class="wrap">
+    <p class="kicker reveal">Video</p>
+    <h2 class="reveal">The whole idea, animated.</h2>
+    <div class="video-frame reveal">
+      <video id="fedVideo" controls preload="metadata" playsinline poster="assets/video-poster.jpg"
+             aria-label="FedPCD: narrated walkthrough">
+        <source src="assets/fedpcd-video.mp4" type="video/mp4" />
+        <track kind="captions" src="assets/fedpcd-video.vtt" srclang="en" label="English" />
+      </video>
+    </div>
+    <div class="chapters reveal" id="chapters" aria-label="Video chapters">
+      <button class="chap" type="button" data-t="12"><span>0:12</span>FedAvg</button>
+      <button class="chap" type="button" data-t="45"><span>0:45</span>Clients left behind</button>
+      <button class="chap" type="button" data-t="81"><span>1:21</span>Existing fairness methods</button>
+      <button class="chap" type="button" data-t="123"><span>2:03</span>From PCD to FedPCD</button>
+      <button class="chap" type="button" data-t="153"><span>2:33</span>The constrained program</button>
+      <button class="chap" type="button" data-t="210"><span>3:30</span>The tolerance τ</button>
+      <button class="chap" type="button" data-t="244"><span>4:04</span>Client history</button>
+      <button class="chap" type="button" data-t="284"><span>4:44</span>History in action</button>
+      <button class="chap" type="button" data-t="320"><span>5:20</span>Guarantees</button>
+      <button class="chap" type="button" data-t="368"><span>6:08</span>The algorithm</button>
+      <button class="chap" type="button" data-t="393"><span>6:33</span>Accuracy</button>
+      <button class="chap" type="button" data-t="464"><span>7:44</span>Fairness</button>
+      <button class="chap" type="button" data-t="533"><span>8:53</span>Convergence</button>
+      <button class="chap" type="button" data-t="566"><span>9:26</span>What matters</button>
+    </div>
+    <p class="caption reveal">A ten-minute tour: why the average can leave clients behind, how FedPCD's projection and its client history work, what the theory guarantees, and the results on CIFAR-10, CIFAR-100 and Fashion-MNIST.</p>
+    <p class="footnote reveal">Narration voice generated with <a href="https://elevenlabs.io" target="_blank" rel="noopener">ElevenLabs</a>.</p>
+  </div>
+</section>
+
+<!-- ===================== INTERACTIVE FIGURE ===================== -->
+<section id="figure" class="section section-alt">
+  <div class="wrap">
+    <p class="kicker reveal">The mechanism, interactively</p>
+    <h2 class="reveal">FedAvg averages. <span class="brand">FedPCD&nbsp;checks every client.</span></h2>
+    <p class="lead reveal">Three clients send updates that pull in different directions, and their normalized average <span class="m">g̃<sub>0</sub></span> is the FedAvg direction. Each client asks for a minimum of progress, <span class="m">g̃<sub>i</sub><sup>⊤</sup>d̃ ≥ τ‖g̃<sub>i</sub>‖²</span>, which admits a half-space of directions. FedPCD projects the average onto the shaded region where every client is satisfied. <strong>Drag the client arrows</strong> and <strong>slide&nbsp;<span class="m">τ</span></strong> to see when the average has to bend, and by how much.</p>
+
+    <div class="figure-wrap reveal">
+      <div class="vec-left">
+        <div class="vec-stage">
+          <svg id="vecSvg" viewBox="0 0 600 600" role="group" aria-label="Interactive figure: drag a client arrow, or use the sliders, to see how FedPCD projects the FedAvg direction onto the region that satisfies every client"></svg>
+          <div class="vec-readout" id="vecReadout"></div>
+        </div>
+        <p class="legend-title">In the figure <span class="legend-hint">(click a layer to hide it)</span></p>
+        <div class="legend" id="vecLegend"></div>
+      </div>
+
+      <div class="vec-controls">
+        <div class="ctl-row">
+          <button id="tourBtn" class="btn btn-primary btn-sm" type="button">
+            <svg viewBox="0 0 24 24" class="ico ico-fill"><path d="M8 5v14l11-7z"/></svg>
+            Watch it work
+          </button>
+          <button id="resetBtn" class="btn btn-sm" type="button">
+            <svg viewBox="0 0 24 24" class="ico"><path d="M4 4v6h6M20 20v-6h-6"/><path d="M5 14a7 7 0 0 0 13 1M19 10A7 7 0 0 0 6 9"/></svg>
+            Reset
+          </button>
+        </div>
+
+        <label class="slider-label" for="tauSlider">
+          <span>Tolerance <span class="m">τ</span></span><span class="tau-val" id="tauVal">0.25</span>
+        </label>
+        <input type="range" id="tauSlider" min="0" max="0.4" step="0.01" value="0.25" />
+        <p class="ctl-hint">At τ = 0, FedPCD only asks that no client gets worse, to first order. A larger τ tightens every constraint, and the update bends further toward the clients that need it.</p>
+
+        <p class="ctl-sub">Client directions</p>
+        <label class="slider-label" for="c1Slider">
+          <span>Client 1 <span class="m">g̃₁</span></span><span class="tau-val" id="c1Val">10°</span>
+        </label>
+        <input type="range" id="c1Slider" min="10" max="170" step="1" value="10" />
+        <label class="slider-label" for="c2Slider">
+          <span>Client 2 <span class="m">g̃₂</span></span><span class="tau-val" id="c2Val">45°</span>
+        </label>
+        <input type="range" id="c2Slider" min="10" max="170" step="1" value="45" />
+        <label class="slider-label" for="c3Slider">
+          <span>Client 3 <span class="m">g̃₃</span></span><span class="tau-val" id="c3Val">155°</span>
+        </label>
+        <input type="range" id="c3Slider" min="10" max="170" step="1" value="155" />
+        <div class="preset-row">
+          <button class="preset" type="button" id="presetPaper">The paper's example</button>
+          <button class="preset" type="button" id="presetAgree">Clients that agree</button>
+          <button class="preset" type="button" id="presetSplit">Two against one</button>
+        </div>
+
+        <div class="state-badge" id="stateBadge" role="status" aria-live="polite"></div>
+
+        <p class="footnote" id="figNote">Unit client directions in two dimensions, with equal weights. The experiments use τ between 0.005 and 0.1. It is larger here so that the geometry is easy to see.</p>
+      </div>
+    </div>
+    <p class="caption reveal">An interactive version of the gradient-space panel of Figure 2 in the paper, in the same colors. It opens on the paper's example: clients at 10°, 45° and 155° with <span class="m">τ = 0.25</span>. Only client 3's constraint is active there, so the update is the average plus <span class="m">μ<sub>3</sub><sup>⋆</sup> = 0.36</span> of client 3's direction, and the other two clients still get more than their minimum.</p>
+  </div>
+</section>
+
+<!-- ============================ METHOD ============================ -->
+<section id="method" class="section">
+  <div class="wrap">
+    <p class="kicker reveal">The idea</p>
+    <h2 class="reveal">The average sets the course. Clients decide when it bends.</h2>
+    <div class="cols">
+      <div class="col-text">
+        <p class="reveal">FedPCD is a federated adaptation of <a href="https://daravaram.github.io/PCD/" target="_blank" rel="noopener">Priority-Constrained Descent (PCD)</a>, a method for problems in which one objective matters more than the others. Here the FedAvg update takes the primary role, and each client's own update defines a secondary constraint.</p>
+
+        <p class="reveal">Each participating client returns its model displacement <span class="m">Δ<sub>i,t</sub></span> after <span class="m">K</span> local steps, as in FedAvg. The server divides it by the local learning rate to obtain a pseudo-gradient, and aggregates these with the FedAvg weights:</p>
+
+        <div class="eqn reveal">\[ g_{i,t} \;=\; \frac{\Delta_{i,t}}{\eta_\ell} \;=\; \frac{\theta_t-\theta_{i,t}^{(K)}}{\eta_\ell}, \qquad \bar g_t \;=\; \sum_{i\in\mathcal{S}_t} \bar p_{i,t}\, g_{i,t} \]</div>
+
+        <p class="reveal">The aggregate and every client direction are then normalized:</p>
+
+        <div class="eqn reveal">\[ \tilde g_{0,t} \;=\; \frac{\bar g_t}{\lVert\bar g_t\rVert+\varepsilon}, \qquad \tilde g_{i,t} \;=\; \frac{g_{i,t}}{\lVert g_{i,t}\rVert+\varepsilon} \]</div>
+
+        <p class="reveal">The update is the direction <em>closest to the normalized average</em> that still makes a <span class="m">τ</span>-fraction of progress along every client's direction:</p>
+
+        <div class="eqn reveal">\[ \tilde d_t^\star \;=\; \arg\min_{\tilde d}\; \frac{1}{2}\left\lVert \tilde d-\tilde g_{0,t}\right\rVert^2 \quad \mathrm{s.t.} \quad \tilde g_{i,t}^{\top}\tilde d \;\geq\; \tau \lVert \tilde g_{i,t}\rVert^2, \qquad i\in\mathcal{S}_t \]</div>
+
+        <p class="reveal">Each constraint is a half-space of acceptable directions. This small convex quadratic program is therefore the <strong>Euclidean projection of the FedAvg direction onto their intersection</strong>, and its solution is unique. Its optimality conditions give it one revealing form:</p>
+
+        <div class="eqn reveal">\[ \tilde d_t^\star \;=\; \tilde g_{0,t} \;+\; \sum_{i\in\mathcal{A}} \mu_i^\star\, \tilde g_{i,t}, \qquad \mu_i^\star \geq 0 \]</div>
+
+        <p class="reveal">The average keeps a coefficient of <strong>one</strong>. A client enters only through a non-negative multiplier, and that multiplier is zero unless the client's constraint is active. FedPCD does not replace the global update with a reweighted or symmetric multi-objective direction. It retains the average as the primary direction and applies the minimal correction that the clients require.</p>
+
+        <p class="reveal">Because the program works with normalized directions, the server rescales the solution to the length of the aggregate before taking the step:</p>
+
+        <div class="eqn reveal">\[ d_t \;=\; \frac{\lVert \bar g_t\rVert}{\lVert \tilde d_t^\star\rVert}\,\tilde d_t^\star, \qquad \theta_{t+1} \;=\; \theta_t-\eta_g\, d_t \]</div>
+
+        <p class="reveal note-inline"><strong>When nothing needs fixing.</strong> If the average already satisfies every constraint, then <span class="m">d̃<sup>⋆</sup> = g̃<sub>0</sub></span>, and the rescaling gives <span class="m">d<sub>t</sub> = ḡ<sub>t</sub></span>. FedPCD introduces no directional correction in that round.</p>
+      </div>
+
+      <div class="col-fig">
+        <div class="steps-card reveal sticky-fig">
+          <p class="steps-title">One round of FedPCD</p>
+          <p class="steps-sub">Algorithm 1 in the paper. On the clients, it is a FedAvg round.</p>
+          <ol class="steps">
+            <li><span class="who">Clients</span>The server samples <span class="m">S<sub>t</sub></span> and broadcasts <span class="m">θ<sub>t</sub></span>. Each sampled client trains locally for <span class="m">K</span> steps and sends back <span class="m">Δ<sub>i,t</sub></span>.</li>
+            <li class="new"><span class="who">Server</span>Form the pseudo-gradients <span class="m">g<sub>i,t</sub> = Δ<sub>i,t</sub> / η<sub>ℓ</sub></span> and their weighted aggregate <span class="m">ḡ<sub>t</sub></span>.</li>
+            <li class="new"><span class="who">Server</span>Drop cache entries older than <span class="m">H</span> rounds. The ones that remain, <span class="m">h<sub>i,t</sub></span>, become constraints too.</li>
+            <li class="new"><span class="who">Server</span>Normalize every direction and solve the program for <span class="m">d̃<sup>⋆</sup></span>.</li>
+            <li class="new"><span class="who">Server</span>Rescale to <span class="m">‖ḡ<sub>t</sub>‖</span>, update <span class="m">θ<sub>t+1</sub> = θ<sub>t</sub> − η<sub>g</sub>d<sub>t</sub></span>, and store the participants' current pseudo-gradients in the cache.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <figure class="wide-fig reveal">
+      <div class="scroller"><img src="assets/system-diagram.png" width="2600" height="698" alt="FedPCD system diagram: client pseudo-gradients feed the client constraints and the primary FedAvg direction. If the primary direction satisfies every constraint the step is FedAvg; otherwise the smallest correction is added. A gradient-space panel shows the projection." loading="lazy" /></div>
+      <figcaption>The system diagram of the paper, for three participating clients at round <span class="m">t</span>. Left: the steps that produce the final direction. Right: the same example in gradient space. The half-space of each client defines the feasible region, and the projection shows the minimum distortion needed to satisfy every client.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ============================ HISTORY ========================== -->
+<section id="history" class="section section-alt">
+  <div class="wrap">
+    <p class="kicker reveal">Partial participation</p>
+    <h2 class="reveal">A short memory for the clients who are away.</h2>
+    <p class="lead reveal">In practice only 5% or 10% of clients join each round, so each round's program sees only a handful of them. A client with unusual data can go unseen for many rounds, and while it is away nothing protects it.</p>
+    <div class="prose">
+      <p class="reveal">FedPCD gives the server a history window of <span class="m">H</span> rounds. It keeps the most recent pseudo-gradient of every client that took part within the window, and each cached direction adds one more constraint, <span class="m">h̃<sub>i,t</sub><sup>⊤</sup>d̃ ≥ τ‖h̃<sub>i,t</sub>‖²</span>. A client that returns overwrites its entry, and an entry older than <span class="m">H</span> rounds is removed. The primary direction <span class="m">ḡ<sub>t</sub></span> is still computed only from the clients of the current round. History changes who is protected, not what the average is.</p>
+      <p class="reveal">Under independent uniform participation at rate <span class="m">ρ</span>, the expected number of distinct clients represented once the window has filled is</p>
+      <div class="eqn reveal">\[ N\left(1-(1-\rho)^{H+1}\right) \]</div>
+      <p class="reveal">With <span class="m">N = 100</span> clients, <span class="m">ρ = 0.1</span> and <span class="m">H = 10</span>, that is about 69 clients in every program instead of 10.</p>
+    </div>
+
+    <div class="cache-wrap reveal" id="cacheWidget">
+      <div class="cache-stage">
+        <div class="cache-grid" id="cacheGrid" role="img" aria-label="One hundred clients. Those sampled this round and those still in the server's cache constrain the update."></div>
+        <div class="cache-key" aria-hidden="true">
+          <span><i class="k-now"></i>sampled this round</span>
+          <span><i class="k-old"></i>cached, paler when older</span>
+          <span><i></i>not represented</span>
+        </div>
+      </div>
+      <div class="cache-panel">
+        <div class="cache-count">
+          <span class="cache-num" id="cacheNum">0</span>
+          <span class="cache-lbl">of 100 clients constrain the update in round <span id="cacheRound">0</span></span>
+        </div>
+        <p class="cache-break" id="cacheBreak"></p>
+        <svg class="cache-spark" id="cacheSpark" viewBox="0 0 320 74" preserveAspectRatio="none" role="img" aria-label="Number of constraints per round"></svg>
+        <p class="cache-break" id="cacheExpect"></p>
+        <div class="cache-ctl">
+          <div class="ctl-line">
+            <span>Participation <span class="m">ρ</span></span>
+            <span class="seg" id="rhoSeg" role="group" aria-label="Participation rate">
+              <button type="button" data-rho="0.05" aria-pressed="false">5%</button>
+              <button type="button" data-rho="0.1" aria-pressed="true">10%</button>
+            </span>
+          </div>
+          <label class="slider-label" for="hSlider">
+            <span>History window <span class="m">H</span></span><span class="tau-val" id="hVal">10</span>
+          </label>
+          <input type="range" id="hSlider" min="0" max="10" step="1" value="10" />
+          <div class="ctl-row" style="margin:18px 0 0">
+            <button id="cachePlay" class="btn btn-sm" type="button">Pause</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="caption reveal">A simulation of the cache alone: 100 clients, sampled uniformly without replacement each round, as in the experiments. Set <span class="m">H = 0</span> to see what the program holds without history.</p>
+
+    <figure class="wide-fig tall reveal">
+      <div class="scroller"><img src="assets/history-demo.png" width="2200" height="880" alt="Demonstration of history: the constrained program at rounds 1, 3, 16 and 30, and the number of secondary constraints per round rising from 3 toward about 20." loading="lazy" /></div>
+      <figcaption>The paper's synthetic demonstration, with <span class="m">N = 30</span> clients, 10% participation, <span class="m">H = 10</span> and <span class="m">τ = 0.1</span>. Top: the program at four rounds. Paler arrows are older cache entries, and red arrows are minority clients that do not satisfy the constraint. Bottom: the number of secondary constraints per round. Without history the program never holds more than three. In round 16 no minority client is sampled, but a cached one still constrains the update, and <span class="m">d̃<sup>⋆</sup></span> with and without history point in different directions.</figcaption>
+    </figure>
+    <p class="caption reveal">The window is a trade-off. A longer one represents more clients, and it also keeps older directions.</p>
+  </div>
+</section>
+
+<!-- ========================= GUARANTEES ========================= -->
+<section id="guarantees" class="section">
+  <div class="wrap">
+    <p class="kicker reveal">Guarantees</p>
+    <h2 class="reveal">What the constrained update guarantees.</h2>
+    <div class="grid grid-guarantees">
+      <article class="card reveal">
+        <div class="card-no">01</div>
+        <h3>A minimum of progress for every client</h3>
+        <p>Whenever the program is feasible, its solution satisfies <span class="m">g̃<sub>i,t</sub><sup>⊤</sup>d̃<sup>⋆</sup> ≥ τ‖g̃<sub>i,t</sub>‖²</span> for every client of the round and for every cached client. With <span class="m">τ &gt; 0</span>, the update is positively aligned with each of them by construction.</p>
+      </article>
+      <article class="card reveal">
+        <div class="card-no">02</div>
+        <h3>Unchanged when no client falls short</h3>
+        <p>If the normalized average already meets every constraint, the projection is the identity and <span class="m">d̃<sup>⋆</sup> = g̃<sub>0</sub></span>. After rescaling, <span class="m">d<sub>t</sub> = ḡ<sub>t</sub></span>: the round keeps the conventional federated direction, with no correction.</p>
+      </article>
+      <article class="card reveal">
+        <div class="card-no">03</div>
+        <h3>The smallest correction, at FedAvg's step length</h3>
+        <p>Otherwise the solution is the unique closest admissible direction to the average, and only active constraints contribute to it. The result is rescaled to <span class="m">‖ḡ<sub>t</sub>‖</span>, so the program changes the direction of the update and not its magnitude.</p>
+      </article>
+      <article class="card reveal">
+        <div class="card-no">04</div>
+        <h3>An <span class="m" style="color:inherit">O(1/T)</span> rate</h3>
+        <p>With full participation, deterministic local steps, no history, <span class="m">L</span>-smooth client objectives and a uniform alignment margin <span class="m">γ</span>, the round-averaged squared norm of the global gradient falls as <span class="m">O(1/T)</span> with constant learning rates, including for <span class="m">K &gt; 1</span> local steps (Theorem 4.1).</p>
+      </article>
+      <article class="card reveal">
+        <div class="card-no">05</div>
+        <h3>Every client stationary, not just their average</h3>
+        <p>The same rate holds for the clients' own gradients. Under the same conditions every accumulation point is <strong>composite multi-stationary</strong>: each client is stationary on its own. That is stronger than Pareto stationarity, where nonzero client gradients may simply cancel (Corollary 4.2).</p>
+      </article>
+      <article class="card card-quiet reveal">
+        <div class="card-no">∎</div>
+        <h3>Full proofs in the paper</h3>
+        <p>The alignment and local-drift lemmas, the descent argument behind the rate, and a careful account of what the client-progress and stationarity statements do and do not cover.</p>
+        <a class="textlink" href="#" data-link="paper">See the appendix →</a>
+      </article>
+    </div>
+
+    <div class="thm reveal">
+      <p class="caption" style="margin:0 0 10px">Theorem 4.1, for a server step <span class="m">0 &lt; η<sub>g</sub> ≤ γ<sub>eff</sub> / (LK(1+r))</span>. Here <span class="m">r</span> measures the drift of <span class="m">K</span> local steps and <span class="m">γ<sub>eff</sub> = γ(1−r) − r</span> is the alignment margin that remains after it. The margin <span class="m">γ</span> describes the geometry of the constrained direction and is not a hyperparameter.</p>
+      <div class="eqn">\[ \frac{1}{T}\sum_{t=0}^{T-1}\left\lVert\nabla F(\theta_t)\right\rVert^2 \;\leq\; \frac{2\left[F(\theta_0)-F_\star\right]}{\eta_g\,\gamma_{\mathrm{eff}}\,\gamma\,K(1-r)\,T} \;=\; \mathcal{O}(1/T) \]</div>
+    </div>
+  </div>
+</section>
+
+<!-- ========================== RESULTS =========================== -->
+<section id="results" class="section section-alt">
+  <div class="wrap">
+    <p class="kicker reveal">Results</p>
+    <h2 class="reveal">A higher average, a stronger tail, fewer rounds.</h2>
+    <p class="lead reveal">CIFAR-10, CIFAR-100 and Fashion-MNIST with 100 clients, at 5% and 10% participation and three levels of heterogeneity. That makes 18 settings, each averaged over five seeds, against ten baselines: FedAvg, AFL, q-FFL, Ditto, FedMGDA+, FedFV, FedLF, FedHEAL, FedPW and CRAFT.</p>
+
+    <div class="stat-row">
+      <div class="stat reveal"><div class="stat-num">18<span> / 18</span></div><div class="stat-lbl">settings in which FedPCD has the <b>highest global accuracy</b> <span class="m">ā</span>. On CIFAR-100 it leads the strongest competitor, CRAFT, by 1.7 to 5.6 points.</div></div>
+      <div class="stat reveal"><div class="stat-num">17<span> / 18</span></div><div class="stat-lbl">settings in which it also has the <b>highest worst-10% client accuracy</b> <span class="m">W<sub>10%</sub></span>. The exception is Fashion-MNIST at 10% participation and α = 0.01, where FedLF reaches 65.73% against 63.22%.</div></div>
+      <div class="stat reveal"><div class="stat-num">10–44<span>%</span></div><div class="stat-lbl">of the communication rounds are enough to <b>reach FedAvg's final accuracy</b>. FedPCD also reaches the strongest baseline's final accuracy earlier in 16 of the 18 settings.</div></div>
+    </div>
+
+    <div class="alpha-bar reveal">
+      <span class="ab-lbl">Figures at heterogeneity</span>
+      <span class="seg" id="alphaSeg" role="group" aria-label="Dirichlet heterogeneity level shown in the figures">
+        <button type="button" data-alpha="0p01" data-label="0.01" aria-pressed="true">α = 0.01</button>
+        <button type="button" data-alpha="0p1" data-label="0.1" aria-pressed="false">α = 0.1</button>
+        <button type="button" data-alpha="1" data-label="1" aria-pressed="false">α = 1</button>
+      </span>
+      <span class="ab-note">A smaller α means more heterogeneous clients. The text beside each figure describes α = 0.01, the hardest setting. All figures fix <span class="m">τ = 0.02</span> and <span class="m">H = 10</span>.</span>
+    </div>
+
+    <div class="result-block reveal">
+      <figure>
+        <a class="fig-link" href="assets/clients-a0p01.png" target="_blank" rel="noopener" aria-label="Open the figure at full size"><img class="fig-img" data-fig="clients" src="assets/clients-a0p01.png" width="1700" height="1158" alt="Histograms of per-client test accuracy for FedPCD, FedAvg and the strongest baseline, on three datasets and two participation rates." loading="lazy" /></a>
+        <figcaption>Per-client test accuracy at <span class="m">α = <span data-alpha-label>0.01</span></span>, pooled over five seeds, for FedPCD, FedAvg and the strongest baseline of each setting. Dashed lines mark the means.</figcaption>
+      </figure>
+      <div class="result-text">
+        <h3>The gains reach the clients who need them</h3>
+        <p>On CIFAR-10 at 5% participation, FedPCD reaches <strong>71.90%</strong> global accuracy, against 65.59% for the strongest baseline, FedLF, and 48.09% for FedAvg. Its worst 10% of clients reach <strong>52.88%</strong>, more than 14 points above FedLF's.</p>
+        <p>Compared with FedAvg, the whole distribution of client accuracies moves to the right and its lower tail thins out. Compared with the strongest baseline, more of the clients sit near the top.</p>
+        <p class="footnote">Numbers in the text are those of the paper's Table 1, at FedPCD's best τ. The figures fix τ = 0.02, so their labels differ slightly.</p>
+      </div>
+    </div>
+
+    <div class="result-block reveal reverse">
+      <figure>
+        <a class="fig-link" href="assets/frontier-a0p01.png" target="_blank" rel="noopener" aria-label="Open the figure at full size"><img class="fig-img" data-fig="frontier" src="assets/frontier-a0p01.png" width="1700" height="1233" alt="Global accuracy against the spread of client accuracies for all eleven methods; FedPCD sits at or near the bottom-right corner." loading="lazy" /></a>
+        <figcaption>Global accuracy <span class="m">ā</span> against client spread <span class="m">σ<sub>c</sub></span> at <span class="m">α = <span data-alpha-label>0.01</span></span>. The arrows on the axes point toward better, so the bottom-right corner is best. Crosses show the range over the five seeds.</figcaption>
+      </figure>
+      <div class="result-text">
+        <h3>Even, without holding everyone down</h3>
+        <p>Spread alone can mislead, because a method can look even by keeping every client low. On CIFAR-100, AFL has the lowest <span class="m">σ<sub>c</sub></span> in all six settings, at global accuracies between 5.64% and 14.55%.</p>
+        <p>Plotted against accuracy, FedPCD is at least as accurate and at least as even as <strong>all ten baselines</strong> on CIFAR-10 and Fashion-MNIST at 5% participation, and as at least nine of the ten at 10%.</p>
+        <p>On CIFAR-100 its spread is higher than the baselines', because <span class="m">σ<sub>c</sub></span> grows with the accuracy it is measured around. Jain's fairness index does not, and it ranks FedPCD first in all six CIFAR-100 settings.</p>
+      </div>
+    </div>
+
+    <div class="result-block reveal">
+      <figure>
+        <a class="fig-link" href="assets/convergence-a0p01.png" target="_blank" rel="noopener" aria-label="Open the figure at full size"><img class="fig-img" data-fig="convergence" src="assets/convergence-a0p01.png" width="1700" height="1128" alt="Global accuracy against communication round for FedPCD, FedAvg and the three strongest baselines; FedPCD reaches FedAvg's final accuracy much earlier." loading="lazy" /></a>
+        <figcaption>Global accuracy against communication rounds at <span class="m">α = <span data-alpha-label>0.01</span></span>, for FedAvg, FedPCD and the three strongest baselines. Dots mark where FedPCD reaches FedAvg's final accuracy, and stars where it reaches the strongest baseline's. Where it does not, a hollow ring marks where that baseline reaches FedAvg's final accuracy.</figcaption>
+      </figure>
+      <div class="result-text">
+        <h3>The same accuracy in fewer rounds</h3>
+        <p>On CIFAR-10, FedPCD reaches FedAvg's final accuracy by round 110 of 500, about <strong>4.5× fewer rounds</strong>. At 5% participation it reaches the final accuracy of the strongest baseline by round 280.</p>
+        <p>On CIFAR-100 it matches FedAvg's final accuracy by rounds 180 and 140, at 5% and 10% participation. On Fashion-MNIST it needs 40 and 30 of the 300 rounds.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========================= WHAT MATTERS ======================== -->
+<section id="ablation" class="section">
+  <div class="wrap">
+    <p class="kicker reveal">What matters</p>
+    <h2 class="reveal">History does most of the work. Every part helps.</h2>
+    <p class="lead reveal">Take the history away and FedPCD falls from 74.84% to 59.26% on CIFAR-10, close to FedAvg's 57.47%. The other components cost less to remove, and each of them still costs something.</p>
+
+    <div class="abl-wrap">
+      <div class="abl-card reveal">
+        <p class="abl-title">Component ablation</p>
+        <p class="abl-sub">CIFAR-10, 10% participation, α = 0.01, five seeds</p>
+        <div class="abl-head"><span>Variant</span><span>Global accuracy</span><span>ā (%) ↑</span><span>W<sub>10%</sub> ↑</span></div>
+        <div class="abl-row full"><span class="name">FedPCD</span><span class="bar"><i style="width:74.84%"></i></span><span class="val">74.84</span><span class="w10">58.03</span></div>
+        <div class="abl-row"><span class="name">with τ = 0</span><span class="bar"><i style="width:74.31%"></i></span><span class="val">74.31</span><span class="w10">57.55</span></div>
+        <div class="abl-row"><span class="name">without normalization</span><span class="bar"><i style="width:72.99%"></i></span><span class="val">72.99</span><span class="w10">54.44</span></div>
+        <div class="abl-row"><span class="name">without the primary direction</span><span class="bar"><i style="width:70.75%"></i></span><span class="val">70.75</span><span class="w10">46.86</span></div>
+        <div class="abl-row drop"><span class="name">without history</span><span class="bar"><i style="width:59.26%"></i></span><span class="val">59.26</span><span class="w10">29.65</span></div>
+        <div class="abl-row ref"><span class="name">FedAvg</span><span class="bar"><i style="width:57.47%"></i></span><span class="val">57.47</span><span class="w10">29.93</span></div>
+        <p class="abl-foot">From the paper's component ablation. Variants with history use τ = 0.01, the best value for this setting in Table 1. The history-free variant uses its own best tested value, τ = 0.1.</p>
+      </div>
+
+      <figure class="abl-fig reveal">
+        <a class="fig-link" href="assets/history-sweep.png" target="_blank" rel="noopener" aria-label="Open the figure at full size"><img class="fig-img" src="assets/history-sweep.png" width="1700" height="1276" alt="Global accuracy, worst-10% accuracy and the number of active constraints as the history window grows from 0 to 10 rounds, on three datasets." loading="lazy" /></a>
+        <figcaption>The history window sweep at <span class="m">τ = 0.02</span> and <span class="m">α = 0.01</span>. Top: global accuracy, with FedAvg dashed. Middle: worst-10% accuracy. Bottom: the number of active constraints. On CIFAR-10 at 5% participation, global accuracy climbs from below 50% without history to above 70% with a ten-round window. The largest gains come from the first few rounds of memory, and the returns diminish after that even though the number of constraints keeps growing.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- =========================== SCOPE ============================ -->
+<section id="scope" class="section section-alt">
+  <div class="wrap narrow">
+    <p class="kicker reveal">Scope</p>
+    <h2 class="reveal">What FedPCD assumes, and what it does not claim.</h2>
+    <ul class="scope-list">
+      <li class="reveal"><span class="dot"></span>The convergence theorem covers <strong>full participation, deterministic local steps and no history</strong> (<span class="m">H = 0</span>). Stochastic gradients, partial participation and cached directions are outside it. The experiments use all three, so the theorem describes an idealized version of what is run.</li>
+      <li class="reveal"><span class="dot"></span>The rate also assumes that the program stays feasible and that its solution keeps a <strong>uniform alignment margin</strong> <span class="m">γ &gt; 0</span> with every nonzero client pseudo-gradient, at every round. This is a real restriction on the client directions and not a consequence of smoothness. Two exactly opposite client directions, for instance, cannot both make positive progress.</li>
+      <li class="reveal"><span class="dot"></span>The <strong>composite multi-stationarity</strong> conclusion is conditional on that geometry. Arbitrary heterogeneous client objectives need not share a stationary point.</li>
+      <li class="reveal"><span class="dot"></span>Client protection means <strong>first-order directional progress</strong>. It is not a guarantee that every client's loss decreases at every round, and it is not a guarantee about client accuracy.</li>
+      <li class="reveal"><span class="dot"></span>FedPCD does <strong>not lead on every metric</strong>. On Fashion-MNIST at 10% participation and α = 0.01, FedLF has the better worst-10% accuracy and the lower spread. On CIFAR-100, FedPCD's <span class="m">σ<sub>c</sub></span> is higher than the baselines'.</li>
+      <li class="reveal"><span class="dot"></span><span class="m">τ</span> is <strong>one fixed value</strong> for all clients and rounds, and the best value shifts with heterogeneity. The headline counts use the best of six tested values in each setting, as the paper's text does. With a single <span class="m">τ = 0.02</span> throughout, Table 1 still gives FedPCD the highest global accuracy in all 18 settings, and the highest worst-10% accuracy in 15.</li>
+      <li class="reveal"><span class="dot"></span>The server has to see <strong>each client's pseudo-gradient individually</strong> and keep it for <span class="m">H</span> rounds. That limits the use of FedPCD with secure aggregation, and motivates privacy-compatible variants.</li>
+      <li class="reveal"><span class="dot"></span>The evaluation uses <strong>100 clients, one local epoch and three image-classification benchmarks</strong>. Behavior under many local steps, where client drift degrades the pseudo-gradient directions, is not established.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ======================== CITATION ============================ -->
+<section id="cite" class="section section-cite">
+  <div class="wrap">
+    <p class="kicker reveal">Citation</p>
+    <h2 class="reveal">Cite FedPCD</h2>
+    <div class="cite-card reveal">
+      <button class="copy-btn" id="copyBib" aria-label="Copy BibTeX" type="button">
+        <svg viewBox="0 0 24 24" class="ico"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+<pre id="bibtex">@misc{irshaid2026fedpcd,
+  title  = {{FedPCD}: Priority-Constrained Federated Aggregation},
+  author = {Irshaid, Yousef and Varam, Dara and AlHajri, Mohamed I.},
+  year   = {2026},
+  note   = {Preprint, under review},
+  url    = {https://daravaram.github.io/FedPCD/}
+}</pre>
+    </div>
+    <p class="cite-note reveal">FedPCD builds on <a href="https://daravaram.github.io/PCD/" target="_blank" rel="noopener">Priority-Constrained Descent</a> (TMLR 2026). This entry will be updated when the preprint is on arXiv.</p>
+  </div>
+  <footer class="footer">
+    <div class="wrap footer-inner">
+      <div>
+        <p class="foot-title">FedPCD: Priority-Constrained Federated Aggregation</p>
+        <p class="foot-sub">Yousef Irshaid, Dara Varam &amp; Mohamed I. AlHajri · American University of Sharjah</p>
+      </div>
+      <div class="foot-links">
+        <a href="#" data-link="paper">Paper</a>
+        <a href="#" data-link="arxiv">arXiv</a>
+        <a href="#" data-link="code">Code</a>
+        <a href="https://daravaram.github.io/PCD/" target="_blank" rel="noopener">PCD</a>
+        <a href="mailto:varam@mit.edu">Contact</a>
+      </div>
+    </div>
+  </footer>
+</section>
+
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite">Copied to clipboard</div>
+
+<script src="js/projection.js"></script>
+<script src="js/cache.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
