@@ -6,8 +6,8 @@ preprint, under review). It is the sibling of the [PCD page](https://daravaram.g
 the same design system with a different theme color.
 
 A static page: HTML, CSS and vanilla JS, with no build step. GitHub Pages serves the `main` branch, so
-pushing to `main` publishes it. External requests: Google Fonts (with system-font fallbacks) and KaTeX
-from jsDelivr for the equations.
+pushing to `main` publishes it. External requests: Google Fonts (with system-font fallbacks), KaTeX
+from jsDelivr for the equations, and a hidden visitor-map counter (visitormap.workers.dev).
 
 ```
 index.html          the page

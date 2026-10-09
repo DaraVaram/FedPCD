@@ -387,6 +387,9 @@ a:focus-visible,button:focus-visible,input:focus-visible,.leg-item:focus-visible
 .toast{position:fixed;bottom:28px;left:50%;transform:translate(-50%,16px);background:var(--ink);color:#fff;padding:12px 22px;border-radius:10px;font-size:14.5px;font-weight:500;opacity:0;pointer-events:none;transition:all .3s var(--ease);z-index:120;box-shadow:var(--shadow-lg);}
 .toast.show{opacity:1;transform:translate(-50%,0);}
 
+/* hidden visitor-map widget: rendered (so the visit is logged) but invisible */
+.visitor-widget{position:fixed;right:0;bottom:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;z-index:-1;}
+
 /* ========================= RESPONSIVE ========================= */
 @media (max-width:980px){
   .figure-wrap{grid-template-columns:1fr;}
