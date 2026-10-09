@@ -37,8 +37,9 @@ stylesheet recolors the figure.
 ## Video
 
 The Video section plays `assets/fedpcd-video.mp4` with English captions from `assets/fedpcd-video.vtt`
-and `assets/video-poster.jpg` as the still. The MP4 is currently the narrated 720p30 cut from the Manim
-project (`FedPCD-Video/out/`). To replace it, drop in a new render and regenerate the captions from its
+and `assets/video-poster.jpg` as the still. The MP4 is the web cut of the 1080p60 master from the Manim project
+(`FedPCD-Video/out/FedPCD-video-1080p60-web.mp4`, H.264, about 51 MB). To replace it, drop in a new
+render and regenerate the captions from its
 `.srt` (add a `WEBVTT` header, use `.` instead of `,` in the timestamps). The chapter buttons under the
 player take their times from the `data-t` attributes in `index.html`, which follow
 `FedPCD-Video/out/chapters.txt`. The narration voice is ElevenLabs text-to-speech, credited in a

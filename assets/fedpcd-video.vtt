@@ -9,335 +9,335 @@ This is FedPCD:
 00:00:08.835 --> 00:00:10.230
 priority-constrained federated aggregation.
 
-00:00:12.833 --> 00:00:17.813
+00:00:12.800 --> 00:00:17.780
 In federated learning, many clients train one shared model without ever sharing their data.
 
-00:00:18.233 --> 00:00:22.651
+00:00:18.217 --> 00:00:22.634
 Each round, the server sends the current model to a small sample of clients.
 
-00:00:22.651 --> 00:00:26.753
+00:00:22.634 --> 00:00:26.737
 Each of them trains it locally, and sends back how its copy changed.
 
-00:00:27.200 --> 00:00:33.566
+00:00:27.183 --> 00:00:33.550
 The server averages these updates, weighted by how much data each client holds, and takes a step.
 
-00:00:33.566 --> 00:00:34.690
+00:00:33.550 --> 00:00:34.673
 This is FedAvg.
 
-00:00:35.133 --> 00:00:37.726
+00:00:35.117 --> 00:00:37.710
 In practice, clients hold very different data.
 
-00:00:37.726 --> 00:00:44.023
+00:00:37.710 --> 00:00:44.007
 The smaller the Dirichlet parameter alpha, the more each client's data is dominated by a few classes.
 
-00:00:45.133 --> 00:00:48.693
+00:00:45.083 --> 00:00:48.643
 With data this different, client updates pull in different directions.
 
-00:00:49.133 --> 00:00:50.919
+00:00:49.083 --> 00:00:50.869
 Their average suits the majority.
 
-00:00:50.919 --> 00:00:53.776
+00:00:50.869 --> 00:00:53.726
 Measure how far each client gets along it:
 
-00:00:53.776 --> 00:00:56.633
+00:00:53.726 --> 00:00:56.583
 two clients gain, and the third one loses.
 
-00:00:57.067 --> 00:01:01.745
+00:00:57.033 --> 00:01:01.712
 Across a whole federation, this shows up as uneven accuracy.
 
-00:01:01.745 --> 00:01:10.167
+00:01:01.712 --> 00:01:10.133
 On CIFAR-10 with strong heterogeneity, FedAvg averages forty-eight percent, while its worst tenth of clients reaches barely nineteen.
 
-00:01:10.600 --> 00:01:13.964
+00:01:10.567 --> 00:01:13.931
 Fair federated learning asks for more than a good average.
 
-00:01:13.964 --> 00:01:20.020
+00:01:13.931 --> 00:01:19.987
 It wants a small spread across clients and a strong worst ten percent, without giving up global accuracy.
 
-00:01:21.100 --> 00:01:25.358
+00:01:21.067 --> 00:01:25.325
 Existing fairness methods change the aggregation in one of three ways.
 
-00:01:25.358 --> 00:01:32.713
+00:01:25.325 --> 00:01:32.680
 They reweight clients toward the worst off, they correct conflicting updates, or they search for a common descent direction.
 
-00:01:33.163 --> 00:01:43.227
+00:01:33.117 --> 00:01:43.181
 Here is what four of them do with the same three client updates.
 
-00:01:43.677 --> 00:01:47.548
+00:01:43.617 --> 00:01:47.488
 They differ in their details, but they share a pattern.
 
-00:01:47.548 --> 00:01:52.968
+00:01:47.488 --> 00:01:52.907
 They change the global direction, or they treat every client as a symmetric peer.
 
-00:01:53.418 --> 00:01:57.676
+00:01:53.350 --> 00:01:57.608
 Yet the average is already the update the shared objective prefers.
 
-00:01:57.676 --> 00:02:02.321
+00:01:57.608 --> 00:02:02.253
 Replacing it can be unnecessary when it already helps every client enough.
 
-00:02:03.233 --> 00:02:11.663
+00:02:03.333 --> 00:02:11.763
 FedPCD builds on Priority-Constrained Descent, or PCD, a method for problems where one objective matters more than the others.
 
-00:02:12.100 --> 00:02:19.809
+00:02:12.200 --> 00:02:19.909
 PCD follows the gradient of the primary objective, and bends away from it only as much as the secondary objectives require.
 
-00:02:20.233 --> 00:02:26.723
+00:02:20.350 --> 00:02:26.840
 FedPCD makes the federated average the primary direction, and turns every client into a secondary constraint.
 
-00:02:27.167 --> 00:02:28.719
+00:02:27.283 --> 00:02:28.836
 The average sets the course.
 
-00:02:28.719 --> 00:02:32.757
+00:02:28.836 --> 00:02:32.873
 The clients only decide when it has to bend, and by how much.
 
-00:02:33.867 --> 00:02:36.511
+00:02:33.950 --> 00:02:36.594
 Back to our three clients.
 
-00:02:36.511 --> 00:02:39.156
+00:02:36.594 --> 00:02:39.239
 FedPCD works with normalized directions:
 
-00:02:39.156 --> 00:02:43.387
+00:02:39.239 --> 00:02:43.470
 the average, g-tilde-zero, and one direction per client.
 
-00:02:43.833 --> 00:02:46.722
+00:02:43.917 --> 00:02:46.805
 Each client asks for a minimum of progress:
 
-00:02:46.722 --> 00:02:51.416
+00:02:46.805 --> 00:02:51.499
 the update must move at least a fraction tau along that client's direction.
 
-00:02:51.416 --> 00:02:53.943
+00:02:51.499 --> 00:02:54.027
 The directions that do form a half-space.
 
-00:02:54.367 --> 00:02:58.417
+00:02:54.467 --> 00:02:58.517
 Directions inside every half-space satisfy all clients at once.
 
-00:02:58.417 --> 00:03:01.567
+00:02:58.517 --> 00:03:01.667
 The average falls outside client three's half-space.
 
-00:03:02.000 --> 00:03:09.360
+00:03:02.117 --> 00:03:09.477
 So FedPCD projects the average onto this feasible region, to the closest direction that satisfies every client.
 
-00:03:09.800 --> 00:03:17.100
+00:03:09.917 --> 00:03:17.217
 Only client three's constraint is active, so the update is the average plus a small multiple of client three's direction.
 
-00:03:17.100 --> 00:03:20.750
+00:03:17.217 --> 00:03:20.866
 The other two clients still get more than their minimum.
 
-00:03:21.167 --> 00:03:23.811
+00:03:21.300 --> 00:03:23.944
 Formally, this is a small quadratic program.
 
-00:03:23.811 --> 00:03:29.477
+00:03:23.944 --> 00:03:29.610
 Stay as close as possible to the average, subject to one progress constraint per client.
 
-00:03:30.567 --> 00:03:35.507
+00:03:30.717 --> 00:03:35.657
 When the average already satisfies every client, no constraint is active.
 
-00:03:35.507 --> 00:03:40.897
+00:03:35.657 --> 00:03:41.047
 FedPCD then returns the average unchanged, and the update is exactly FedAvg.
 
-00:03:41.333 --> 00:03:48.043
+00:03:41.483 --> 00:03:48.193
 When a client falls short, only its constraint switches on, and FedPCD adds just enough of that client's direction.
 
-00:03:48.467 --> 00:03:51.255
+00:03:48.633 --> 00:03:51.422
 The tolerance tau sets the minimum progress.
 
-00:03:51.255 --> 00:03:56.434
+00:03:51.422 --> 00:03:56.601
 At zero, FedPCD only asks that no client gets worse, to first order.
 
-00:03:56.434 --> 00:04:03.207
+00:03:56.601 --> 00:04:03.373
 As tau grows, the constraints tighten, and the update bends further toward the clients that need it.
 
-00:04:04.300 --> 00:04:08.385
+00:04:04.450 --> 00:04:08.535
 In practice, only five or ten percent of clients join each round.
 
-00:04:08.385 --> 00:04:11.790
+00:04:08.535 --> 00:04:11.940
 So each round's program sees only a handful of clients.
 
-00:04:12.233 --> 00:04:18.063
+00:04:12.383 --> 00:04:18.213
 A client with unusual data can go unseen for many rounds, and while it is away, nothing protects it.
 
-00:04:18.500 --> 00:04:21.122
+00:04:18.650 --> 00:04:21.272
 FedPCD gives the server a short memory.
 
-00:04:21.122 --> 00:04:27.490
+00:04:21.272 --> 00:04:27.640
 It keeps each client's most recent direction for H rounds, and every cached direction adds a constraint.
 
-00:04:27.933 --> 00:04:31.398
+00:04:28.083 --> 00:04:31.548
 The primary direction still comes only from the current round.
 
-00:04:31.398 --> 00:04:34.863
+00:04:31.548 --> 00:04:35.013
 History changes who is protected, not what the average is.
 
-00:04:35.300 --> 00:04:43.770
+00:04:35.450 --> 00:04:43.920
 With a hundred clients, ten percent participation and a ten-round window, about sixty-nine clients are represented in expectation, instead of ten.
 
-00:04:44.867 --> 00:04:47.261
+00:04:45.000 --> 00:04:47.395
 Here is the paper's small simulation:
 
-00:04:47.261 --> 00:04:53.647
+00:04:47.395 --> 00:04:53.780
 thirty clients, three per round, and a minority of five whose directions conflict with everyone else's.
 
-00:04:54.067 --> 00:04:57.629
+00:04:54.217 --> 00:04:57.779
 Without history, the program never holds more than three constraints.
 
-00:04:57.629 --> 00:05:01.547
+00:04:57.779 --> 00:05:01.697
 With history, the count climbs toward twenty as the cache fills.
 
-00:05:01.967 --> 00:05:05.590
+00:05:02.133 --> 00:05:05.756
 A minority client first enters the cache in round three.
 
-00:05:05.590 --> 00:05:11.387
+00:05:05.756 --> 00:05:11.553
 In round sixteen, no minority client is sampled, but a cached one still constrains the update.
 
-00:05:11.833 --> 00:05:14.782
+00:05:12.000 --> 00:05:14.948
 With history, FedPCD keeps protecting the minority.
 
-00:05:14.782 --> 00:05:18.993
+00:05:14.948 --> 00:05:19.160
 Without it, the update follows whoever happened to be sampled.
 
-00:05:20.100 --> 00:05:21.738
+00:05:20.233 --> 00:05:21.871
 Why does this converge?
 
-00:05:21.738 --> 00:05:23.375
+00:05:21.871 --> 00:05:23.508
 Start with a trap.
 
-00:05:23.375 --> 00:05:29.925
+00:05:23.508 --> 00:05:30.059
 Client gradients can cancel, so their average shrinks to zero while no single client is done.
 
-00:05:30.375 --> 00:05:34.054
+00:05:30.500 --> 00:05:34.179
 FedPCD's constraints keep the update aligned with every client.
 
-00:05:34.054 --> 00:05:40.595
+00:05:34.179 --> 00:05:40.720
 Under a uniform alignment condition, the update cannot vanish while the clients' own gradients remain large.
 
-00:05:41.045 --> 00:05:51.055
+00:05:41.167 --> 00:05:51.177
 With full participation, exact local gradients and no history, the average squared norm of the global gradient then falls as one over T, with constant learning rates.
 
-00:05:51.505 --> 00:05:55.228
+00:05:51.617 --> 00:05:55.340
 The same rate holds for the clients' own gradients.
 
-00:05:55.228 --> 00:05:59.365
+00:05:55.340 --> 00:05:59.477
 So, under these conditions, every limit point is composite multi-stationary:
 
-00:05:59.365 --> 00:06:02.261
+00:05:59.477 --> 00:06:02.372
 each client is stationary on its own.
 
-00:06:02.261 --> 00:06:07.225
+00:06:02.372 --> 00:06:07.337
 That is stronger than Pareto stationarity, where nonzero gradients may simply cancel.
 
-00:06:08.300 --> 00:06:12.225
+00:06:08.417 --> 00:06:12.342
 Put together, a FedPCD round looks like FedAvg on the clients.
 
-00:06:12.225 --> 00:06:15.080
+00:06:12.342 --> 00:06:15.197
 They train locally and send back their updates.
 
-00:06:15.500 --> 00:06:22.510
+00:06:15.633 --> 00:06:22.643
 The server turns these into pseudo-gradients, refreshes its cache, normalizes every direction, and solves the small program.
 
-00:06:22.960 --> 00:06:28.607
+00:06:23.083 --> 00:06:28.731
 It rescales the result to the length of the average update, and takes the step.
 
-00:06:28.607 --> 00:06:31.996
+00:06:28.731 --> 00:06:32.119
 When no constraint is active, this is exactly FedAvg.
 
-00:06:33.033 --> 00:06:34.566
+00:06:33.200 --> 00:06:34.733
 Now, the experiments.
 
-00:06:34.566 --> 00:06:45.293
+00:06:34.733 --> 00:06:45.460
 We test on CIFAR-10, CIFAR-100 and Fashion-MNIST, with a hundred clients, five or ten percent participation, and three levels of heterogeneity.
 
-00:06:45.293 --> 00:06:51.423
+00:06:45.460 --> 00:06:51.590
 That makes eighteen settings, each averaged over five seeds, against ten baselines.
 
-00:06:51.858 --> 00:06:59.768
+00:06:52.033 --> 00:06:59.943
 FedPCD has the highest global accuracy in all eighteen settings, and the highest worst-ten-percent accuracy in seventeen.
 
-00:07:00.192 --> 00:07:07.012
+00:07:00.383 --> 00:07:07.204
 On CIFAR-10, the margin is largest where the data is most heterogeneous and participation lowest.
 
-00:07:07.012 --> 00:07:15.652
+00:07:07.204 --> 00:07:15.843
 There, FedPCD reaches seventy-one point nine percent, against sixty-five point six for FedLF, and forty-eight point one for FedAvg.
 
-00:07:16.092 --> 00:07:22.072
+00:07:16.283 --> 00:07:22.263
 Its worst ten percent of clients reach fifty-two point nine percent, more than fourteen points above FedLF.
 
-00:07:22.492 --> 00:07:32.105
+00:07:22.700 --> 00:07:32.313
 On CIFAR-100, FedPCD leads the strongest competitor, CRAFT, by between one point seven and five point six points of global accuracy.
 
-00:07:32.105 --> 00:07:43.092
+00:07:32.313 --> 00:07:43.300
 On Fashion-MNIST, where the best methods already pass eighty-five percent, margins are smaller, and in one setting FedLF keeps the better worst ten percent.
 
-00:07:44.167 --> 00:07:47.402
+00:07:44.383 --> 00:07:47.619
 Do these gains reach the clients who need them?
 
-00:07:47.402 --> 00:07:51.357
+00:07:47.619 --> 00:07:51.573
 Here is every client's accuracy on CIFAR-10, pooled over five seeds.
 
-00:07:51.807 --> 00:07:58.437
+00:07:52.017 --> 00:07:58.647
 Compared with FedAvg, FedPCD shifts the whole distribution to the right, and its lower tail thins out.
 
-00:07:58.873 --> 00:08:06.304
+00:07:59.083 --> 00:08:06.514
 Against the strongest baseline, FedLF, more of FedPCD's clients sit near the top.
 
-00:08:06.754 --> 00:08:12.979
+00:08:06.950 --> 00:08:13.176
 Spread alone can mislead, because a method can look even by holding everyone down.
 
-00:08:12.979 --> 00:08:21.429
+00:08:13.176 --> 00:08:21.625
 On CIFAR-100, AFL has the lowest spread in all six settings, at global accuracies between five and fifteen percent.
 
-00:08:21.872 --> 00:08:26.943
+00:08:22.067 --> 00:08:27.138
 So we plot accuracy against spread, where the bottom right is best.
 
-00:08:26.943 --> 00:08:36.662
+00:08:27.138 --> 00:08:36.857
 On CIFAR-10 and Fashion-MNIST at five percent participation, FedPCD is at least as accurate and at least as even as all ten baselines.
 
-00:08:37.089 --> 00:08:45.693
+00:08:37.300 --> 00:08:45.904
 On CIFAR-100, FedPCD's spread is slightly higher, because spread grows with the accuracy it is measured around.
 
-00:08:45.693 --> 00:08:52.779
+00:08:45.904 --> 00:08:52.990
 Jain's fairness index, which does not, ranks FedPCD first in all six CIFAR-100 settings.
 
-00:08:53.733 --> 00:08:56.015
+00:08:54.067 --> 00:08:56.348
 FedPCD also gets there sooner.
 
-00:08:56.015 --> 00:09:06.053
+00:08:56.348 --> 00:09:06.387
 On CIFAR-10 at five percent participation, it reaches FedAvg's final accuracy by round one hundred ten, four and a half times sooner.
 
-00:09:06.500 --> 00:09:12.670
+00:09:06.833 --> 00:09:13.003
 It passes the final accuracy of the strongest baseline, FedLF, by round two hundred eighty.
 
-00:09:13.100 --> 00:09:25.470
+00:09:13.450 --> 00:09:25.820
 Across all eighteen settings, FedPCD reaches FedAvg's final accuracy within ten to forty-four percent of the rounds, and passes the strongest baseline's final accuracy early in sixteen of them.
 
-00:09:26.567 --> 00:09:28.368
+00:09:26.900 --> 00:09:28.701
 What makes this work?
 
-00:09:28.368 --> 00:09:30.169
+00:09:28.701 --> 00:09:30.503
 Above all, the history.
 
-00:09:30.169 --> 00:09:40.077
+00:09:30.503 --> 00:09:40.410
 On CIFAR-10 at ten percent participation, removing it drops FedPCD from seventy-four point eight percent to fifty-nine point three, close to FedAvg.
 
-00:09:40.500 --> 00:09:42.385
+00:09:40.850 --> 00:09:42.735
 The other parts help too.
 
-00:09:42.385 --> 00:09:50.300
+00:09:42.735 --> 00:09:50.650
 Removing the primary direction costs about four points, removing normalization about two, and setting tau to zero about half a point.
 
-00:09:50.722 --> 00:09:56.639
+00:09:51.100 --> 00:09:57.016
 Grow the history window, and accuracy climbs with the number of active constraints.
 
-00:09:56.639 --> 00:10:04.376
+00:09:57.016 --> 00:10:04.753
 At five percent participation, global accuracy rises from forty-eight percent without history to seventy-two with ten rounds.
 
-00:10:04.809 --> 00:10:09.729
+00:10:05.200 --> 00:10:10.120
 Most of the gain arrives within the first three rounds of memory, and the returns diminish after that.
 
-00:10:10.800 --> 00:10:14.754
+00:10:11.200 --> 00:10:15.154
 The average should lead, but not at any client's expense.
 
-00:10:15.200 --> 00:10:24.720
+00:10:15.600 --> 00:10:25.120
 FedPCD keeps the FedAvg direction, protects every recently seen client with a minimum-progress constraint, and bends only as much as those constraints require.
 
-00:10:25.167 --> 00:10:30.567
+00:10:25.567 --> 00:10:30.967
 Open directions include adaptive tolerances, and variants compatible with secure aggregation.
